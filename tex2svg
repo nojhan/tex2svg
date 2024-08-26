@@ -1,22 +1,78 @@
-if [ "$#" -lt 1 ]; then
-  echo "Usage: tex2svg LATEX_CODE (OUTPUT_FILE)"
-  exit -1
+#!/usr/bin/bash
+
+set -e
+set -o pipefail
+
+TAG="$(basename ${0})"
+PREAMBLE=""
+DOCUMENT=""
+OUT_FILE="" # No output file → print on standard output.
+
+# Read optional argument.
+if (( $# >= 2 )) ; then
+    if [[ "${1}" == "--preamble" ]] ; then
+        shift
+        if (( $# == 0 )) ; then
+            echo "Usage: "
+            exit 64
+        else
+            PREAMBLE="${1}"
+            shift
+        fi
+    fi # --preamble
 fi
-if [ "$#" -ge 2 ]; then
-  OUT_FILE="$2"
+# From there, we have shifted away the optional arguments.
+
+# Configure input and output.
+if (( $# == 0 )); then
+    DOCUMENT="$(< /dev/stdin)" # Read from standard input.
+elif (( $# >= 1 )) ; then
+    DOCUMENT="$(cat ${1})"
+    if (( $# >= 2 )) ; then
+        OUT_FILE="${2}" # Explicit output file.
+    fi
+fi
+echo "[${TAG}] Preamble: ${PREAMBLE}" >&2
+echo "[${TAG}] Document: ${DOCUMENT}" >&2
+
+# Set output.
+if [[ -z "${OUT_FILE}" ]] ; then
+    echo "[${TAG}] Output in: standard output." >&2
 else
-  OUT_FILE="latex_fig.svg"
+    echo "[${TAG}] Output in: ${OUT_FILE}"
 fi
 
-BASE=~/lib/tex2svg
+# Script directory = where to find template.
+SCRIPT_DIR="$(cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd)"
+echo "[${TAG}] Script templates in: ${SCRIPT_DIR}/" >&2
 
-VAL=$1
+# Prepare the document and preamble contents.
+#    duplicate backslash ⤵  escape ampersands ⤵  replace newlines ⤵ …
+DOCUMENT=$(echo "$DOCUMENT" | sed 's/\\/\\\\/g'| sed 's/&/\\&/g'| sed ':a;N;$!ba;s/\n/\\n/g' | sed 's/\$/\\$/g')
+PREAMBLE=$(echo "$PREAMBLE" | sed 's/\\/\\\\/g'| sed 's/&/\\&/g'| sed ':a;N;$!ba;s/\n/\\n/g' | sed 's/\$/\\$/g')
 
-# duplicate backslash
-VAL=$(echo $VAL | sed 's/\\/\\\\/g')
-# ampersand
-VAL=$(echo $VAL | sed 's/&/\\&/g')
+# Temporary working directory.
+TMP_DIR="$(mktemp -d)"
+echo "[${TAG}] Working directory: ${TMP_DIR}" >&2
 
-sed "s/VAR/$VAL/g" $BASE/latex_fig_template.tex > $BASE/latex_fig.tex
-pdflatex -output-directory $BASE $BASE/latex_fig.tex
-pdf2svg $BASE/latex_fig.pdf $OUT_FILE
+# Insert the TeX code in the template.
+cat "${SCRIPT_DIR}/latex_template.tex"| sed 's/__DOCUMENT__/'"${DOCUMENT}"'/g' | sed 's/__PREAMBLE__/'"${PREAMBLE}"'/g' > "${TMP_DIR}/doc.tex"
+echo "[${TAG}] TeX file: ${TMP_DIR}/doc.tex" >&2
+
+# Compile in PDF.
+pdflatex -output-directory "${TMP_DIR}" "${TMP_DIR}/doc.tex" 1>&2
+echo "[${TAG}] PDF file: ${TMP_DIR}/doc.pdf" >&2
+
+if [[ -z "${OUT_FILE}" ]] ; then
+    OUTF="${TMP_DIR}/doc.svg"
+else
+    OUTF="${OUT_FILE}"
+fi
+# Export as SVG.
+pdf2svg "${TMP_DIR}/doc.pdf" "$OUTF" 1>&2
+echo "[${TAG}] SVG file: ${OUTF}" >&2
+
+# Print output if asked.
+if [[ -z "${OUT_FILE}" ]] ; then
+    cat "${OUTF}"
+fi

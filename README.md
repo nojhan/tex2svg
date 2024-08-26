@@ -1,31 +1,57 @@
 # tex2svg
 
-Convert latex to svg. A typical use would be to turn formulas into images, in order to be used in presentations or other integrated visualizations.
+Convert LaTeX to SVG. A typical use would be to turn formulas into images, in order to be used in presentations or other integrated visualizations.
 
 ## Usage
 
-Call the program as ``tex2svg LATEX_CODE [TARGET_FILE.svg]``. Example: 
+Call the program as ``tex2svg [--preamble <LATEX_CODE>] [LATEX_CODE] [TARGET_FILE]``.
 
+## Examples
+
+Minimal example:
 ```sh
-tex2svg '$$\exp(i\cdot\pi) + 1 = 0$$' fig.svg
+tex2svg '$$\exp(i\cdot\pi) + 1 = 0$$' > formula.svg
 ```
+
+Specify a LaTeX preamble command:
+```sh
+tex2svg --preamble '\DeclareMathOperator*{\argmin}{arg\,min}' '$\argmin_{x\in X} f(x)$' formula.svg
+```
+
+Pipe in a multi-line LaTeX file as input:
+```sh
+cat file.tex | tex2svg > fig.svg
+```
+Or (alternatively);
+```sh
+tex2svg < file.tex > fig.svg
+```
+
+Indicate the output file as an argument:
+```sh
+tex2svg '$$\exp(i\cdot\pi) + 1 = 0$$' formula.svg
+```
+
 
 ## Requirements
 
-The tool requires ``pdflatex``, ``pdf2svg`` to be available. These can easily be installed via
- 
+The tool requires ``pdflatex``, ``pdf2svg`` to be available. These can easily be installed (under a Debian-like Linux distribution) via:
+
  ```sh
  sudo apt install pdflatex pdf2svg
  ```
- 
+
 ## Installation
 
-Currently, there is no automated installation. However, it's quite simple:
+Currently, there is no automated installation.
+
+To install manually, type (as root):
 
 ```sh
-mkdir ~/lib ~/bin
-git clone https://github.com/yannikschaelte/tex2svg ~/lib/tex2svg
-ln -s ~/lib/tex2svg/tex2svg ~/bin/tex2svg
+git clone https://github.com/yannikschaelte/tex2svg
+mkdir /opt/tex2svg/
+cp tex2svg/tex2svg /opt/tex2svg/
+cp tex2svg/latex_template.tex /opt/tex2svg
+echo 'export PATH="$PATH:/opt/tex2svg/"' >> ~/.bashrc
 ```
 
-Last, make sure that ``tex2svg`` can be found, e.g. via ``export PATH=$PATH:~/bin`` in `.bashrc`.
